@@ -1,11 +1,12 @@
 # importing pygame module
-import pygame
+import pygame, random
+from pygame import sprite
 
 # initialize required components
 pygame.init()
 
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+SCREEN_WIDTH = 606
+SCREEN_HEIGHT = 606
 
 # Player class
 class Player(pygame.sprite.Sprite):
@@ -21,35 +22,33 @@ class Player(pygame.sprite.Sprite):
         self.rect.top = y
         self.rect.left = x
 
-    # # change the speed of the player
-    # # incase we want to increase or decrease speed
-    # def changeSpeed(self, nx, ny):
-    #     self.change_x += nx
-    #     self.change_y += ny
+    # function that changes speed of sprite
+    def changespeed(self, nx, ny):
+        self.change_x += nx
+        self.change_y += ny
     
-    # update position of the player
-    # Find a new position for the player
-    def update(self, pressed_keys):
-        # Get the old position, in case we need to go back to it
-        if pressed_keys[pygame.K_UP]:
-            self.rect.move_ip(0, -30)
-        if pressed_keys[pygame.K_LEFT]:
-            self.rect.move_ip(-30, 0)
-        if pressed_keys[pygame.K_DOWN]:
-            self.rect.move_ip(0, 30)
-        if pressed_keys[pygame.K_RIGHT]:
-            self.rect.move_ip(30, 0)
+    # function that updates position of player
+    def update(self):
+        old_x = self.rect.left
+        new_x = old_x + self.change_x
+        self.rect.left = new_x
 
-        if self.rect.left < 0:
-            self.rect.left = 0
-        if self.rect.top < 0:
-            self.rect.top = 0
-        if self.rect.right > SCREEN_WIDTH:
-            self.rect.right = SCREEN_WIDTH
-        if self.rect.bottom > SCREEN_HEIGHT:
-            self.rect.bottom = SCREEN_HEIGHT
+        old_y = self.rect.top
+        new_y = old_y + self.change_y
+        self.rect.top = new_y
 
+        # if player goes out of bound we rectify it
+        if self.rect.left < 0 or self.rect.right > SCREEN_WIDTH:
+            self.rect.left = old_x
+        if self.rect.top < 0 or self.rect.bottom > SCREEN_HEIGHT:
+            self.rect.top = old_y
 
+        # collide = pygame.sprite.spritecollide(self, list, False)
+        # if collide:
+        #     self.rect.left = old_x
+        #     self.rect.top = old_y
+
+# initializing our screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
 # load icon and caption
@@ -61,10 +60,21 @@ pygame.display.set_caption("Pacman")
 clock = pygame.time.Clock()
 
 def startGame():
+    # different sprite groups
+    all_sprite_list = pygame.sprite.RenderPlain()
+    ghosts = pygame.sprite.RenderPlain()
+
     # instantiate player object
     player = Player(0, 0, "images/pacman.png")
-    sprite_list = pygame.sprite.RenderPlain()
-    sprite_list.add(player)
+    all_sprite_list.add(player)
+
+    # creating event to multiply ghost every 30 seconds
+    ADD_GHOST = pygame.USEREVENT + 1
+    pygame.time.set_timer(ADD_GHOST, 10000)
+
+    # ghost related directions and logic
+    DIRECTION = [(10, 0), (0, 10), (-10, 0), (0, -10)]
+
     # game loop
     run = True
     while run:
@@ -74,12 +84,63 @@ def startGame():
             if event.type == pygame.QUIT:
                 run = False
 
-        pressed_keys = pygame.key.get_pressed()
-        player.update(pressed_keys)
-        
+            # increase speed to move when key down
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    player.changespeed(0, -30)
+                if event.key == pygame.K_LEFT:
+                    player.changespeed(-30, 0)
+                if event.key == pygame.K_DOWN:
+                    player.changespeed(0, 30)
+                if event.key == pygame.K_RIGHT:
+                    player.changespeed(30, 0)
+               
+            # reduce speed to stop when key up
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_UP:
+                    player.changespeed(0, 30)
+                if event.key == pygame.K_LEFT:
+                    player.changespeed(30, 0)
+                if event.key == pygame.K_DOWN:
+                    player.changespeed(0, -30)
+                if event.key == pygame.K_RIGHT:
+                    player.changespeed(-30, 0)
+            
+            # add ghosts from all existing after certain time
+            if event.type == ADD_GHOST:
+                if len(ghosts) > 0:
+                    for ghost in ghosts:
+                        new_ghost = Player(ghost.rect.left, ghost.rect.top, "images/Blinky.png")
+                        ghosts.add(new_ghost)
+                        all_sprite_list.add(new_ghost)
+                else:
+                    new_ghost = Player(
+                        random.randint(0, SCREEN_WIDTH),
+                        random.randint(0, SCREEN_HEIGHT),
+                        "images/Blinky.png"
+                    )
+                    ghosts.add(new_ghost)
+                    all_sprite_list.add(new_ghost)
+
+        # for now, ghosts just wiggles randomly and multiplies    
+        for ghost in ghosts:
+            direction = DIRECTION[random.randint(0, 3)]
+            ghost.rect.move_ip(direction)
+            # let it not go out of screen
+            if ghost.rect.left < 0:
+                ghost.rect.left = 0
+            if ghost.rect.top < 0:
+                ghost.rect.top = 0
+            if ghost.rect.bottom > SCREEN_HEIGHT:
+                ghost.rect.bottom = SCREEN_HEIGHT
+            if ghost.rect.right > SCREEN_WIDTH:
+                ghost.rect.right = SCREEN_WIDTH
+
+        # update information change for player
+        player.update()
         # CODE FOR DRAWING GOES HERE
         screen.fill((0, 0, 0))
-        sprite_list.draw(screen)
+        all_sprite_list.draw(screen)
         # update changes this frame
         pygame.display.flip()
 
