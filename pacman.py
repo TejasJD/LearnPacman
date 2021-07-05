@@ -1,6 +1,5 @@
 # importing pygame module
 import pygame, random
-from pygame import sprite
 
 # initialize required components
 pygame.init()
@@ -28,26 +27,26 @@ class Player(pygame.sprite.Sprite):
         self.change_y += ny
     
     # function that updates position of player
-    def update(self):
-        old_x = self.rect.left
-        new_x = old_x + self.change_x
-        self.rect.left = new_x
-
-        old_y = self.rect.top
-        new_y = old_y + self.change_y
-        self.rect.top = new_y
-
-        # if player goes out of bound we rectify it
-        if self.rect.left < 0 or self.rect.right > SCREEN_WIDTH:
-            self.rect.left = old_x
-        if self.rect.top < 0 or self.rect.bottom > SCREEN_HEIGHT:
-            self.rect.top = old_y
-
-        # collide = pygame.sprite.spritecollide(self, list, False)
-        # if collide:
-        #     self.rect.left = old_x
-        #     self.rect.top = old_y
-
+    def update(self, pressed_keys):
+        # we move player by arrow keys
+        if pressed_keys[pygame.K_UP]:
+            self.rect.move_ip(0, -15)
+        if pressed_keys[pygame.K_DOWN]:
+            self.rect.move_ip(0, 15)
+        if pressed_keys[pygame.K_LEFT]:
+            self.rect.move_ip(-15, 0)
+        if pressed_keys[pygame.K_RIGHT]:
+            self.rect.move_ip(15, 0)
+        
+        # this keeps player on the screen
+        if self.rect.top < 0:
+            self.rect.top = 0
+        if self.rect.bottom > SCREEN_HEIGHT:
+            self.rect.bottom = SCREEN_HEIGHT
+        if self.rect.right > SCREEN_WIDTH:
+            self.rect.right = SCREEN_WIDTH
+        if self.rect.left < 0:
+            self.rect.left = 0
 
 class Ghost(Player):
     # ghost will have a direction it is currently going in
@@ -61,29 +60,23 @@ class Ghost(Player):
     def set_direction(self, direction):
         self.direction = direction
 
-    def update(self):
-        old_x = self.rect.left
-        new_x = old_x + self.change_x
-        self.rect.left = new_x
-
-        old_y = self.rect.top
-        new_y = old_y + self.change_y
-        self.rect.top = new_y
-
-        # if ghost collides with edges,
-        # we return that it has collided
+    def update(self, directions):
+        self.rect.move_ip(directions[self.direction][0], directions[self.direction][1])
         collide = False
-        if self.rect.left < 0 or self.rect.right > SCREEN_WIDTH:
-            self.rect.left = old_x
+        if self.rect.left < 0:
+            self.rect.left = 0
             collide = True
-        if self.rect.top < 0 or self.rect.bottom > SCREEN_HEIGHT:
-            self.rect.top = old_y
+        if self.rect.top < 0:
+            self.rect.top = 0
             collide = True
-        # everthing is well and good then no need
-        if collide:
-            return True
-        else:
-            return False
+        if self.rect.bottom > SCREEN_HEIGHT:
+            self.rect.bottom = SCREEN_HEIGHT
+            collide = True
+        if self.rect.right > SCREEN_WIDTH:
+            self.rect.right = SCREEN_WIDTH
+            collide = True
+        return collide
+        
 
 # initializing our screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -115,7 +108,7 @@ def startGame():
     pygame.time.set_timer(ADD_GHOST, 5000)
 
     # ghost directions
-    DC = [[-20, 0], [20, 0], [0, 20], [0, -20]]
+    DC = [[-10, 0], [10, 0], [0, 10], [0, -10]]
     toggle = True
 
     # game loop
@@ -126,64 +119,40 @@ def startGame():
             # close the game
             if event.type == pygame.QUIT:
                 run = False
-
-            # increase speed to move when key down
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP:
-                    player.changespeed(0, -30)
-                if event.key == pygame.K_LEFT:
-                    player.changespeed(-30, 0)
-                if event.key == pygame.K_DOWN:
-                    player.changespeed(0, 30)
-                if event.key == pygame.K_RIGHT:
-                    player.changespeed(30, 0)
-               
-            # reduce speed to stop when key up
-            if event.type == pygame.KEYUP:
-                if event.key == pygame.K_UP:
-                    player.changespeed(0, 30)
-                if event.key == pygame.K_LEFT:
-                    player.changespeed(30, 0)
-                if event.key == pygame.K_DOWN:
-                    player.changespeed(0, -30)
-                if event.key == pygame.K_RIGHT:
-                    player.changespeed(-30, 0)
             
             # add ghosts from all existing after certain time
             if event.type == ADD_GHOST:
                 for ghost in ghosts:
                     new_ghost = Ghost(ghost.rect.left, ghost.rect.top, "images/Blinky.png")
-                    new_ghost.direction = random.randint(0, 3)
+                    new_ghost.set_direction(random.randint(0, 3))
                     ghosts.add(new_ghost)
                     all_sprite_list.add(new_ghost)
 
+        # GHOST:
         # for now, ghosts just wiggles randomly and multiplies 
         # ghost movement tactic   
         for ghost in ghosts:
             # ghost moves by toggling speed + and -
             # we update each individually, if it collides we return false
-            if toggle:
-                ghost.changespeed(DC[ghost.direction][0], DC[ghost.direction][1])
-                toggle = False
-            else:
-                ghost.changespeed(-DC[ghost.direction][0], -DC[ghost.direction][1])
-                toggle = True
-            if ghost.update():
-                ghost.direction = random.randint(0, 3)
+            if ghost.update(DC):
+                ghost.set_direction(random.randint(0, 3))
+
+        # PLAYER:
+        # player movement update based on pressed keys
+        pressed_keys = pygame.key.get_pressed() 
+        player.update(pressed_keys)  
 
         # kill ghosts on their death
         pygame.sprite.spritecollide(player, ghosts, True)
         
-        # if we kill all ghosts then you win, if they reach above certain number, you lose
+        # GAME exit conditions upon some conclusion
         if len(ghosts) == 0:
             run = False
             break
         elif len(ghosts) >= 10:
             run = False
             break
-    
-        # update information change for player
-        player.update()
+
         # CODE FOR DRAWING GOES HERE
         screen.fill((0, 0, 0))
         ghosts.draw(screen)
